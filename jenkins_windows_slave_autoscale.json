@@ -1,6 +1,6 @@
 {
     "AWSTemplateFormatVersion": "2010-09-09",
-    "Description": "Cloudformation Jenkins: Windows (2012R2 Base) Node; v1.0",
+    "Description": "Jenkins Autoscaled Windows Slaves - Swarm Connect (31-Aug-2016)",
     "Parameters": {
         "KeyName": {
             "Description" : "Name of an existing EC2 KeyPair to enable SSH access to the instance",
@@ -16,6 +16,14 @@
             "Description" : "Choose VPC to use",
             "Type" : "AWS::EC2::VPC::Id",
             "Default": ""
+        },
+        "IngressCIDR": {
+            "Description": "Enter IP Address 0.0.0.0/32 or CIDR Block for Security Ingress",
+            "Type": "String"
+        },
+        "JNLPPORT": {
+            "Description": "Enter Port for JNLP Slaves to connect to",
+            "Type": "String"
         },
         "JenkinsMaster": {
             "Type": "String",
@@ -151,7 +159,7 @@
                 },
                 {
                     "Label" : { "default": "Jenkins Config" },
-                    "Parameters" : ["JenkinsMaster"]
+                    "Parameters" : ["JenkinsMaster", "IngressCIDR", "JNLPPORT"]
                 }
             ]
         }
@@ -250,60 +258,19 @@
                 ]
             }
         },
-        "LoadBalancerSecurityGroup" : {
-            "Type" : "AWS::EC2::SecurityGroup",
-            "Properties" : {
-                "GroupDescription" : "Setup Ingress/Egress for Windows Load Balancer",
-                "VpcId" : { "Ref" : "VPC" },
-                "SecurityGroupIngress" : [ { "IpProtocol" : "tcp", "FromPort" : "80", "ToPort" : "80", "CidrIp" : "0.0.0.0/0" },
-                                           { "IpProtocol" : "tcp", "FromPort" : "443", "ToPort" : "443", "CidrIp" : "0.0.0.0/0" } ],
-                "SecurityGroupEgress" : [ { "IpProtocol" : "tcp", "FromPort" : "0",  "ToPort" : "65535",  "CidrIp" : "0.0.0.0/0" } ],
-                "Tags" : [
-                    { "Key" : "Name", "Value" : "Windows-ELB-SecurityGroup" }
-                ]
-            }
-        },
-        "ElasticLoadBalancer" : {
-            "Type" : "AWS::ElasticLoadBalancing::LoadBalancer",
-            "Properties" : {
-                "Subnets": [ { "Ref" : "WindowsSubnetA" },{ "Ref" : "WindowsSubnetB" } ],
-                "Subnets" : [ { "Ref" : "WindowsSubnetA" },{ "Ref" : "WindowsSubnetB" }],
-                "SecurityGroups" : [ { "Ref" : "LoadBalancerSecurityGroup" } ],
-                "LBCookieStickinessPolicy" : [
-                    {
-                        "PolicyName" : "PublicELBCookieStickinessPolicy",
-                        "CookieExpirationPeriod" : "3600"
-                    }
-                ],
-                "Listeners" : [
-                    {
-                        "InstancePort": "80",
-                        "LoadBalancerPort": "80",
-                        "InstanceProtocol": "HTTP",
-                        "Protocol": "HTTP",
-                        "PolicyNames" : [ "PublicELBCookieStickinessPolicy" ]
-                    }
-                ],
-                "HealthCheck" : {
-                    "Target" : "HTTP:80/",
-                    "HealthyThreshold" : "2",
-                    "UnhealthyThreshold" : "10",
-                    "Interval" : "90",
-                    "Timeout" : "60"
-                },
-                "Tags" : [
-                    { "Key" : "Name", "Value" : "Windows-ELB" }
-                ]
-            }
-        },
         "InstanceSecurityGroup" : {
             "Type" : "AWS::EC2::SecurityGroup",
             "Properties" : {
                 "GroupDescription" : "Setup Ingress/Egress for Instance/App",
                 "VpcId" : { "Ref" : "VPC" },
                 "SecurityGroupIngress" : [
-                    { "IpProtocol" : "tcp", "FromPort" : "80", "ToPort" : "80", "SourceSecurityGroupId" : { "Ref" : "LoadBalancerSecurityGroup" } } ,
-                    { "IpProtocol" : "tcp", "FromPort" : "443", "ToPort" : "443", "SourceSecurityGroupId" : { "Ref" : "LoadBalancerSecurityGroup" } } ],
+                  { "IpProtocol" : "tcp", "FromPort" : { "Ref" : "JNLPPORT" }, "ToPort" : { "Ref" : "JNLPPORT" }, "CidrIp" : { "Ref" : "IngressCIDR" } } ,
+                  { "IpProtocol" : "tcp", "FromPort" : "8080", "ToPort" : "8080", "CidrIp" : { "Ref" : "IngressCIDR" } },
+                  { "IpProtocol" : "tcp", "FromPort" : "445", "ToPort" : "445", "CidrIp" : { "Ref" : "IngressCIDR" } },
+                  { "IpProtocol" : "tcp", "FromPort" : "139", "ToPort" : "139", "CidrIp" : { "Ref" : "IngressCIDR" } },
+                  { "IpProtocol" : "tcp", "FromPort" : "135", "ToPort" : "135", "CidrIp" : { "Ref" : "IngressCIDR" } },
+                  { "IpProtocol" : "udp", "FromPort" : "137", "ToPort" : "137", "CidrIp" : { "Ref" : "IngressCIDR" } },
+                  { "IpProtocol" : "udp", "FromPort" : "138", "ToPort" : "138", "CidrIp" : { "Ref" : "IngressCIDR" } }],
                 "SecurityGroupEgress" : [
                     { "IpProtocol" : "tcp", "FromPort" : "0",  "ToPort" : "65535",  "CidrIp" : "0.0.0.0/0" } ],
                 "Tags" : [ { "Key" : "Name", "Value" : "Windows-Autoscale-Security-Group" } ]
@@ -378,7 +345,7 @@
             "AdjustmentType" : "ChangeInCapacity",
             "AutoScalingGroupName" : { "Ref" : "WindowsSlaveScaleGroup" },
             "Cooldown" : "600",
-            "ScalingAdjustment" : "2"
+            "ScalingAdjustment" : "1"
           }
         },
 
@@ -400,7 +367,6 @@
                 "MinSize" : { "Ref" : "AutoMin" },
                 "MaxSize" : { "Ref" : "AutoMax" },
                 "DesiredCapacity" : { "Ref" : "AutoDesired" },
-                "LoadBalancerNames" : [ { "Ref" : "ElasticLoadBalancer" } ],
                 "Tags" : [{ "Key" : "Name", "Value" : "Windows-Scale-Group", "PropagateAtLaunch":"true" }]
             }
         },
