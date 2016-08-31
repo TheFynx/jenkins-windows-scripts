@@ -1,0 +1,421 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Cloudformation Jenkins: Windows (2012R2 Base) Node; v1.0",
+    "Parameters": {
+        "KeyName": {
+            "Description" : "Name of an existing EC2 KeyPair to enable SSH access to the instance",
+            "Type" : "AWS::EC2::KeyPair::KeyName",
+            "Default": ""
+        },
+        "RDPSecurityGroup" : {
+            "Description" : "Select Security Group for RDP Access",
+            "Type": "AWS::EC2::SecurityGroup::Id",
+            "Default": ""
+        },
+        "VPC": {
+            "Description" : "Choose VPC to use",
+            "Type" : "AWS::EC2::VPC::Id",
+            "Default": ""
+        },
+        "JenkinsMaster": {
+            "Type": "String",
+            "Default": "jenkins.domain.com",
+            "Description": "URL Of your Jenkins Master Server"
+        },
+        "SubnetA": {
+            "Description" : "Enter CIDR Block to Create (e.g.; 0.0.0.0/24)",
+            "Type" : "String",
+            "Default": ""
+        },
+        "SubnetB": {
+            "Description" : "Enter CIDR Block to Create (e.g.; 0.0.0.0/24)",
+            "Type" : "String",
+            "Default": ""
+        },
+        "AvailabilityZoneA": {
+            "Description" : "Choose Availability Zone to use: Required",
+            "Type" : "AWS::EC2::AvailabilityZone::Name",
+            "Default": ""
+        },
+        "AvailabilityZoneB": {
+            "Description" : "Choose Availability Zone to use: Required",
+            "Type" : "AWS::EC2::AvailabilityZone::Name",
+            "Default": ""
+        },
+        "AutoMin": {
+            "Type": "String",
+            "Default": "1",
+            "AllowedValues": [
+                "1",
+                "2",
+                "3",
+                "4",
+                "5",
+                "6",
+                "7",
+                "8",
+                "9"
+            ],
+            "Description": "Select minimum instance number for Auto Scaling"
+        },
+        "AutoMax": {
+            "Type": "String",
+            "Default": "1",
+            "AllowedValues": [
+                "1",
+                "2",
+                "3",
+                "4",
+                "5",
+                "6",
+                "7",
+                "8",
+                "9"
+            ],
+            "Description": "Select maximum instance number for Auto Scaling"
+        },
+        "AutoDesired": {
+            "Type": "String",
+            "Default": "1",
+            "AllowedValues": [
+                "1",
+                "2",
+                "3",
+                "4",
+                "5",
+                "6",
+                "7",
+                "8",
+                "9"
+            ],
+            "Description": "Select desired instance number for Auto Scaling"
+        },
+        "InstanceType": {
+            "Type": "String",
+            "Default": "t2.micro",
+            "AllowedValues": [
+                "t2.micro",
+                "t2.small",
+                "t2.medium",
+                "m3.medium",
+                "m3.large",
+                "m3.xlarge",
+                "m3.2xlarge",
+                "c3.large",
+                "c3.xlarge",
+                "c3.2xlarge",
+                "c3.4xlarge",
+                "c3.8xlarge",
+                "c4.large",
+                "c4.xlarge",
+                "c4.2xlarge",
+                "c4.4xlarge",
+                "c4.8xlarge",
+                "g2.2xlarge",
+                "r3.large",
+                "r3.xlarge",
+                "r3.2xlarge",
+                "r3.4xlarge",
+                "r3.8xlarge",
+                "i2.xlarge",
+                "i2.2xlarge",
+                "i2.4xlarge",
+                "i2.8xlarge",
+                "d2.xlarge",
+                "d2.2xlarge",
+                "d2.4xlarge",
+                "d2.8xlarge",
+                "hi1.4xlarge",
+                "hs1.8xlarge",
+                "cr1.8xlarge",
+                "cc2.8xlarge",
+                "cg1.4xlarge"
+            ],
+            "ConstraintDescription": "must be a valid EC2 instance type."
+        }
+    },
+    "Metadata" : {
+        "AWS::CloudFormation::Interface" : {
+            "ParameterGroups" : [
+                {
+                    "Label" : { "default": "EC2 Config" },
+                    "Parameters" : ["InstanceType", "KeyName", "RDPSecurityGroup" ]
+                },
+                {
+                    "Label" : { "default": "Autoscale Config" },
+                    "Parameters" : ["AutoMin", "AutoMax", "AutoDesired" ]
+                },
+                {
+                    "Label" : { "default": "VPC Config" },
+                    "Parameters" : ["VPC", "SubnetA", "SubnetB", "AvailabilityZoneA", "AvailabilityZoneB"]
+                },
+                {
+                    "Label" : { "default": "Jenkins Config" },
+                    "Parameters" : ["JenkinsMaster"]
+                }
+            ]
+        }
+    },
+    "Mappings" : {
+        "AWSInstanceType2Arch" : {
+            "t2.micro"    : { "Arch" : "HVM64"  },
+            "t2.small"    : { "Arch" : "HVM64"  },
+            "t2.medium"   : { "Arch" : "HVM64"  },
+            "t2.large"    : { "Arch" : "HVM64"  },
+            "m1.small"    : { "Arch" : "HVM64"  },
+            "m1.medium"   : { "Arch" : "HVM64"  },
+            "m1.large"    : { "Arch" : "HVM64"  },
+            "m1.xlarge"   : { "Arch" : "HVM64"  },
+            "m2.xlarge"   : { "Arch" : "HVM64"  },
+            "m2.2xlarge"  : { "Arch" : "HVM64"  },
+            "m2.4xlarge"  : { "Arch" : "HVM64"  },
+            "m3.medium"   : { "Arch" : "HVM64"  },
+            "m3.large"    : { "Arch" : "HVM64"  },
+            "m3.xlarge"   : { "Arch" : "HVM64"  },
+            "m3.2xlarge"  : { "Arch" : "HVM64"  },
+            "m4.large"    : { "Arch" : "HVM64"  },
+            "m4.xlarge"   : { "Arch" : "HVM64"  },
+            "m4.2xlarge"  : { "Arch" : "HVM64"  },
+            "m4.4xlarge"  : { "Arch" : "HVM64"  },
+            "m4.10xlarge" : { "Arch" : "HVM64"  },
+            "c1.medium"   : { "Arch" : "HVM64"  },
+            "c1.xlarge"   : { "Arch" : "HVM64"  },
+            "c3.large"    : { "Arch" : "HVM64"  },
+            "c3.xlarge"   : { "Arch" : "HVM64"  },
+            "c3.2xlarge"  : { "Arch" : "HVM64"  },
+            "c3.4xlarge"  : { "Arch" : "HVM64"  },
+            "c3.8xlarge"  : { "Arch" : "HVM64"  },
+            "c4.large"    : { "Arch" : "HVM64"  },
+            "c4.xlarge"   : { "Arch" : "HVM64"  },
+            "c4.2xlarge"  : { "Arch" : "HVM64"  },
+            "c4.4xlarge"  : { "Arch" : "HVM64"  },
+            "c4.8xlarge"  : { "Arch" : "HVM64"  },
+            "g2.2xlarge"  : { "Arch" : "HVM64"  },
+            "g2.8xlarge"  : { "Arch" : "HVM64"  },
+            "r3.large"    : { "Arch" : "HVM64"  },
+            "r3.xlarge"   : { "Arch" : "HVM64"  },
+            "r3.2xlarge"  : { "Arch" : "HVM64"  },
+            "r3.4xlarge"  : { "Arch" : "HVM64"  },
+            "r3.8xlarge"  : { "Arch" : "HVM64"  },
+            "i2.xlarge"   : { "Arch" : "HVM64"  },
+            "i2.2xlarge"  : { "Arch" : "HVM64"  },
+            "i2.4xlarge"  : { "Arch" : "HVM64"  },
+            "i2.8xlarge"  : { "Arch" : "HVM64"  },
+            "d2.xlarge"   : { "Arch" : "HVM64"  },
+            "d2.2xlarge"  : { "Arch" : "HVM64"  },
+            "d2.4xlarge"  : { "Arch" : "HVM64"  },
+            "d2.8xlarge"  : { "Arch" : "HVM64"  },
+            "hi1.4xlarge" : { "Arch" : "HVM64"  },
+            "hs1.8xlarge" : { "Arch" : "HVM64"  },
+            "cr1.8xlarge" : { "Arch" : "HVM64"  },
+            "cc2.8xlarge" : { "Arch" : "HVM64"  }
+        },
+        "AWSRegionArch2AMI": {
+            "us-east-1"       : { "HVM64": "ami-74a73263" },
+            "us-west-2"       : { "HVM64": "ami-2426e944" },
+            "us-west-1"       : { "HVM64": "ami-6d0b4b0d" },
+            "eu-west-1"       : { "HVM64": "ami-6fd5b81c" },
+            "eu-central-1"    : { "HVM64": "ami-3f649050" },
+            "ap-northeast-1"  : { "HVM64": "ami-760ff517" },
+            "ap-northeast-2"  : { "HVM64": "ami-f3f13b9d" },
+            "ap-southeast-1"  : { "HVM64": "ami-eceb348f" },
+            "ap-southeast-2"  : { "HVM64": "ami-0b497c68" },
+            "sa-east-1"       : { "HVM64": "ami-f1be299d" }
+        }
+  },
+  "Resources": {
+        "WindowsSubnetA" : {
+            "Type" : "AWS::EC2::Subnet",
+            "Properties" : {
+                "VpcId" : { "Ref" : "VPC" },
+                "AvailabilityZone" : { "Ref": "AvailabilityZoneA" },
+                "CidrBlock" : { "Ref" : "SubnetA" },
+                "Tags" : [
+                    { "Key" : "Name", "Value" : "Windows-Load-Balanced-SubnetA" },
+                    { "Key" : "Application", "Value" : { "Ref" : "AWS::StackId" } },
+                    { "Key" : "Network", "Value" : "Public" }
+                ]
+            }
+        },
+        "WindowsSubnetB" : {
+            "Type" : "AWS::EC2::Subnet",
+            "Properties" : {
+                "VpcId" : { "Ref" : "VPC" },
+                "AvailabilityZone" : { "Ref": "AvailabilityZoneB" },
+                "CidrBlock" : { "Ref" : "SubnetB" },
+                "Tags" : [
+                    { "Key" : "Name", "Value" : "Windows-Load-Balanced-SubnetB" },
+                    { "Key" : "Application", "Value" : { "Ref" : "AWS::StackId" } },
+                    { "Key" : "Network", "Value" : "Public" }
+                ]
+            }
+        },
+        "LoadBalancerSecurityGroup" : {
+            "Type" : "AWS::EC2::SecurityGroup",
+            "Properties" : {
+                "GroupDescription" : "Setup Ingress/Egress for Windows Load Balancer",
+                "VpcId" : { "Ref" : "VPC" },
+                "SecurityGroupIngress" : [ { "IpProtocol" : "tcp", "FromPort" : "80", "ToPort" : "80", "CidrIp" : "0.0.0.0/0" },
+                                           { "IpProtocol" : "tcp", "FromPort" : "443", "ToPort" : "443", "CidrIp" : "0.0.0.0/0" } ],
+                "SecurityGroupEgress" : [ { "IpProtocol" : "tcp", "FromPort" : "0",  "ToPort" : "65535",  "CidrIp" : "0.0.0.0/0" } ],
+                "Tags" : [
+                    { "Key" : "Name", "Value" : "Windows-ELB-SecurityGroup" }
+                ]
+            }
+        },
+        "ElasticLoadBalancer" : {
+            "Type" : "AWS::ElasticLoadBalancing::LoadBalancer",
+            "Properties" : {
+                "Subnets": [ { "Ref" : "WindowsSubnetA" },{ "Ref" : "WindowsSubnetB" } ],
+                "Subnets" : [ { "Ref" : "WindowsSubnetA" },{ "Ref" : "WindowsSubnetB" }],
+                "SecurityGroups" : [ { "Ref" : "LoadBalancerSecurityGroup" } ],
+                "LBCookieStickinessPolicy" : [
+                    {
+                        "PolicyName" : "PublicELBCookieStickinessPolicy",
+                        "CookieExpirationPeriod" : "3600"
+                    }
+                ],
+                "Listeners" : [
+                    {
+                        "InstancePort": "80",
+                        "LoadBalancerPort": "80",
+                        "InstanceProtocol": "HTTP",
+                        "Protocol": "HTTP",
+                        "PolicyNames" : [ "PublicELBCookieStickinessPolicy" ]
+                    }
+                ],
+                "HealthCheck" : {
+                    "Target" : "HTTP:80/",
+                    "HealthyThreshold" : "2",
+                    "UnhealthyThreshold" : "10",
+                    "Interval" : "90",
+                    "Timeout" : "60"
+                },
+                "Tags" : [
+                    { "Key" : "Name", "Value" : "Windows-ELB" }
+                ]
+            }
+        },
+        "InstanceSecurityGroup" : {
+            "Type" : "AWS::EC2::SecurityGroup",
+            "Properties" : {
+                "GroupDescription" : "Setup Ingress/Egress for Instance/App",
+                "VpcId" : { "Ref" : "VPC" },
+                "SecurityGroupIngress" : [
+                    { "IpProtocol" : "tcp", "FromPort" : "80", "ToPort" : "80", "SourceSecurityGroupId" : { "Ref" : "LoadBalancerSecurityGroup" } } ,
+                    { "IpProtocol" : "tcp", "FromPort" : "443", "ToPort" : "443", "SourceSecurityGroupId" : { "Ref" : "LoadBalancerSecurityGroup" } } ],
+                "SecurityGroupEgress" : [
+                    { "IpProtocol" : "tcp", "FromPort" : "0",  "ToPort" : "65535",  "CidrIp" : "0.0.0.0/0" } ],
+                "Tags" : [ { "Key" : "Name", "Value" : "Windows-Autoscale-Security-Group" } ]
+            }
+        },
+        "AutoScaleLaunchConfiguration" : {
+            "Type" : "AWS::AutoScaling::LaunchConfiguration",
+            "Metadata" : {
+                "AWS::CloudFormation::Init" : {
+                    "config" : {
+                        "files" : {
+                            "c:\\cfn\\cfn-hup.conf" : {
+                                "content" : { "Fn::Join" : ["", [
+                                    "[main]\n",
+                                    "stack=", { "Ref" : "AWS::StackId" }, "\n",
+                                    "region=", { "Ref" : "AWS::Region" }, "\n"
+                                ]]}
+                            },
+                            "c:\\cfn\\hooks.d\\cfn-auto-reloader.conf" : {
+                                "content": { "Fn::Join" : ["", [
+                                    "[cfn-auto-reloader-hook]\n",
+                                    "triggers=post.update\n",
+                                    "path=Resources.JenkinsWindowsInstance.Metadata.AWS::CloudFormation::Init\n",
+                                    "action=cfn-init.exe -v -s ", { "Ref" : "AWS::StackId" },
+                                    " --resource AutoScaleLaunchConfiguration",
+                                    " --region ", { "Ref" : "AWS::Region" }, "\n"
+                                ]]}
+                            }
+                        },
+                        "commands" : {
+                            "1-install-chocolately" : {
+                                "command" : "@powershell -NoProfile -ExecutionPolicy Bypass -Command \"iwr https://chocolatey.org/install.ps1 -UseBasicParsing | iex \" && SET PATH=%PATH%;%ALLUSERSPROFILE%\\chocolatey\\bin"
+                            },
+                            "2-install-deps" : {
+                                "command" : "@powershell -NoProfile -ExecutionPolicy Bypass -Command \"C:\\ProgramData\\chocolatey\\bin\\choco.exe install -y git jre8 dotnet4.5 dotnet4.0 dotnet3.5 microsoft-build-tools 7zip visualstudio2013teamexplorer\""
+                            },
+                            "3-install-connect-master" : {
+                                "command" : "@powershell -NoProfile -ExecutionPolicy Bypass -Command \"iwr https://github.com/TheFynx/jenkins-windows-scripts/raw/master/swarm-slave-connect-aws.ps1 -UseBasicParsing | iex"
+                            }
+                        },
+                        "services" : {
+                            "windows" : {
+                                "cfn-hup" : {
+                                    "enabled" : "true",
+                                    "ensureRunning" : "true",
+                                    "files" : ["c:\\cfn\\cfn-hup.conf", "c:\\cfn\\hooks.d\\cfn-auto-reloader.conf"]
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "Properties" : {
+                "KeyName" : { "Ref" : "KeyName" },
+                "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" },
+                            { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "InstanceType" }, "Arch" ] } ] },
+                "AssociatePublicIpAddress" : "true",
+                "InstanceType"   : { "Ref" : "InstanceType" },
+                "SecurityGroups" : [ {"Ref" : "RDPSecurityGroup"}, {"Ref" : "InstanceSecurityGroup"} ],
+                "UserData": { "Fn::Base64" : { "Fn::Join" : ["", [
+                        "<script>",
+                        "cfn-init.exe -v -s ", { "Ref" : "AWS::StackId" } ," --resource AutoScaleLaunchConfiguration --region ", { "Ref" : "AWS::Region" } ," \n",
+                        "cfn-signal.exe -e %ERRORLEVEL% ", { "Fn::Base64" : { "Ref" : "WindowsServerWaitHandle" }}, "\n",
+                        "</script>"
+                        ] ] }
+                }
+            }
+        },
+        "ScaleUpPolicy" : {
+          "Type" : "AWS::AutoScaling::ScalingPolicy",
+          "Properties" : {
+            "AdjustmentType" : "ChangeInCapacity",
+            "AutoScalingGroupName" : { "Ref" : "WindowsSlaveScaleGroup" },
+            "Cooldown" : "600",
+            "ScalingAdjustment" : "2"
+          }
+        },
+
+        "ScaleDownPolicy" : {
+          "Type" : "AWS::AutoScaling::ScalingPolicy",
+          "Properties" : {
+            "AdjustmentType" : "ChangeInCapacity",
+            "AutoScalingGroupName" : { "Ref" : "WindowsSlaveScaleGroup" },
+            "Cooldown" : "1800",
+            "ScalingAdjustment" : "-1"
+          }
+        },
+        "WindowsSlaveScaleGroup" : {
+            "Type" : "AWS::AutoScaling::AutoScalingGroup",
+            "Properties" : {
+                "AvailabilityZones" : { "Fn::GetAZs" : ""},
+                "VPCZoneIdentifier": [ { "Ref" : "WindowsSubnetA" },{ "Ref" : "WindowsSubnetB" }],
+                "LaunchConfigurationName" : {"Ref": "AutoScaleLaunchConfiguration"},
+                "MinSize" : { "Ref" : "AutoMin" },
+                "MaxSize" : { "Ref" : "AutoMax" },
+                "DesiredCapacity" : { "Ref" : "AutoDesired" },
+                "LoadBalancerNames" : [ { "Ref" : "ElasticLoadBalancer" } ],
+                "Tags" : [{ "Key" : "Name", "Value" : "Windows-Scale-Group", "PropagateAtLaunch":"true" }]
+            }
+        },
+        "WindowsServerWaitHandle" : {
+            "Type" : "AWS::CloudFormation::WaitConditionHandle"
+        },
+        "WindowsServerWaitCondition" : {
+            "Type" : "AWS::CloudFormation::WaitCondition",
+            "DependsOn" : "AutoScaleLaunchConfiguration",
+            "Properties" : {
+                "Handle" : {"Ref" : "WindowsServerWaitHandle"},
+                "Timeout" : "1800"
+            }
+        }
+    },
+    "Outputs": {
+    }
+}
